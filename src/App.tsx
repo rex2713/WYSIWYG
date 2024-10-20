@@ -1,4 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useRef, useState } from "react";
+import "./assets/scss/main.scss";
+import DOMPurify from "dompurify";
 
 // 元件類型
 type ComponentType = "text" | "image" | "carousel";
@@ -10,11 +12,44 @@ interface ComponentData {
 }
 
 // 動態元件
+// Todo: 處理XSS攻擊（dangerouslySetInnerHTML）
 const PreviewComponent: React.FC<{
   data: ComponentData;
   onClick: (e: React.MouseEvent<HTMLElement>) => void;
 }> = ({ data, onClick }) => {
   const [classes, setClasses] = useState<string>("");
+
+  // 使用DOMPurify過濾HTML標籤(防止XSS攻擊)
+  const sanitizeConfig = {
+    ALLOWED_TAGS: [
+      "h1",
+      "h2",
+      "h3",
+      "h4",
+      "h5",
+      "h6",
+      "p",
+      "br",
+      "hr",
+      "strong",
+      "em",
+      "a",
+      "ul",
+      "li",
+      "ol",
+      "code",
+      "pre",
+      "code",
+      "div",
+      "table",
+      "td",
+      "tr",
+      "th",
+    ],
+    ALLOWED_ATTR: ["href", "target"],
+  };
+  const sanitizedHTML = DOMPurify.sanitize(data.props.value, sanitizeConfig);
+
   switch (data.type) {
     case "text":
       return (
@@ -31,13 +66,21 @@ const PreviewComponent: React.FC<{
             setClasses("");
           }}
         >
-          {data.props.value || "文字元件"}
+          <div className="px-4 py-2 flex flex-col">
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="textContent inline-block bg-black/5 w-full"
+              dangerouslySetInnerHTML={{ __html: sanitizedHTML }}
+            ></div>
+            {data.props.value === "" && <span>文字元件</span>}
+          </div>
         </button>
       );
     case "image":
       return (
         <button
-          className={`block w-full outline-none ${classes}`}
+          className={`w-full outline-none flex ${classes}`}
+          style={{ justifyContent: data.props.imagePosition || "center" }}
           onClick={(e) => {
             e.preventDefault();
             setClasses(
@@ -69,13 +112,6 @@ const PreviewComponent: React.FC<{
         </button>
       );
     case "carousel":
-      // const [carouselIndex, setCarouselIndex] = useState(0);
-      // useEffect(() => {
-      //   const interval = setInterval(() => {
-      //     setCarouselIndex((carouselIndex + 1) % data.props.images.length);
-      //   }, 2000);
-      //   return () => clearInterval(interval);
-      // }, []);
       const [currentIndex, setCurrentIndex] = useState(0);
 
       const handlePrev = (e: React.MouseEvent) => {
@@ -91,7 +127,7 @@ const PreviewComponent: React.FC<{
       };
       return (
         <button
-          className={`w-full min-h-20 outline-none flex justify-center ${classes}`}
+          className={`w-full min-h-20 outline-none items-center flex justify-center ${classes}`}
           onClick={(e) => {
             e.preventDefault();
             setClasses(
@@ -101,9 +137,15 @@ const PreviewComponent: React.FC<{
           }}
           onBlur={() => setClasses("")}
         >
-          <div className="overflow-hidden relative max-w-[500px]">
+          <div
+            className="overflow-hidden relative w-[500px] h-[300px]"
+            style={{
+              width: data.props.width + "px",
+              height: data.props.height + "px",
+            }}
+          >
             <div
-              className="flex transition-transform duration-500"
+              className="flex transition-transform duration-500 h-full"
               style={{ transform: `translateX(-${currentIndex * 100}%)` }}
             >
               {data.props.images && data.props.images.length !== 0 ? (
@@ -111,7 +153,7 @@ const PreviewComponent: React.FC<{
                   <img
                     key={index}
                     src={image}
-                    className="flex-shrink-0 w-full h-full object-cover"
+                    className="flex-shrink-0 w-[500px] h-[300px] object-cover"
                     style={{
                       width: data.props.width + "px",
                       height: data.props.height + "px",
@@ -123,7 +165,9 @@ const PreviewComponent: React.FC<{
                   />
                 ))
               ) : (
-                <span className="text-black">輪播元件-請先新增圖片</span>
+                <div className="text-black flex justify-center items-center h-full w-full">
+                  輪播元件-請先新增圖片
+                </div>
               )}
             </div>
             {data.props.images && data.props.images.length > 1 && (
@@ -161,10 +205,13 @@ const EditComponent: React.FC<{
     case "text":
       return (
         <div className="bg-white p-4 flex flex-col gap-2 rounded-md border border-title">
-          <span>請輸入想顯示的內容</span>
-          <input
-            type="text"
-            className="outline-none border border-black/50 rounded-md px-2 py-1"
+          <span>
+            請輸入想顯示的內容
+            <br />
+            <span className="text-[12px] text-black">(支援HTML標籤)</span>
+          </span>
+          <textarea
+            className="outline-none border min-h-80 h-full border-black/50 rounded-md px-2 py-1"
             value={component.props.value || ""}
             onChange={(e) => {
               component.props.value = e.target.value;
@@ -231,30 +278,75 @@ const EditComponent: React.FC<{
             />
             <span>px</span>
           </div>
+          <div className="flex justify-between">
+            <label className="flex gap-x-1">
+              <input
+                onChange={(e) => {
+                  component.props.imagePosition = "start";
+                  setComponent(component);
+                }}
+                name="imagePosition"
+                value={component.props.imagePosition}
+                type="radio"
+              />
+              <span>左</span>
+            </label>
+            <label className="flex gap-x-1">
+              <input
+                defaultChecked
+                onChange={(e) => {
+                  component.props.imagePosition = "center";
+                  setComponent(component);
+                }}
+                name="imagePosition"
+                value={component.props.imagePosition}
+                type="radio"
+              />
+              <span>中</span>
+            </label>
+            <label className="flex gap-x-1">
+              <input
+                onChange={(e) => {
+                  component.props.imagePosition = "end";
+                  setComponent(component);
+                }}
+                name="imagePosition"
+                value={component.props.imagePosition}
+                type="radio"
+              />
+              <span>右</span>
+            </label>
+          </div>
         </div>
       );
     case "carousel":
       component.props.images = component.props.images || [];
-      const [inputCounts, setInputCounts] = useState<number>(1);
       return (
         <div className="bg-white p-4 flex flex-col gap-5 rounded-md border border-title">
-          <div className="flex flex-col gap-y-1">
+          <div className="flex flex-col gap-y-2">
             <span>請輸入圖片連結</span>
-            {Array.from({ length: inputCounts }, (_, index) => {
-              return (
-                <input
-                  key={index}
-                  type="text"
-                  className="outline-none border border-black/50 rounded-md px-2 py-1"
-                  value={component.props.images[index] || ""}
-                  onChange={(e) => {
-                    component.props.images[index] = e.target.value;
-                    setComponent(component);
-                  }}
-                />
-              );
-            })}
-            <button onClick={() => setInputCounts((prev) => ++prev)}>
+            {component.props.images.map((image: string, index: number) => (
+              <input
+                key={index}
+                type="text"
+                className="outline-none border border-black/50 rounded-md px-2 py-1"
+                value={image}
+                onChange={(e) => {
+                  component.props.images[index] = e.target.value;
+                  setComponent(component);
+                }}
+              />
+            ))}
+            <button
+              className="bg-title rounded-md text-white text-sm px-2 py-1"
+              onClick={() => {
+                const newImages = [...component.props.images, ""];
+                setComponent({
+                  ...component,
+                  props: { ...component.props, images: newImages },
+                });
+              }}
+            >
               新增圖片
             </button>
           </div>
