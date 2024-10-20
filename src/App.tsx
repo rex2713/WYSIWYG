@@ -387,13 +387,15 @@ function App() {
     useState<ComponentType | null>(null);
   const [editingIndex, setEditingIndex] = useState<number>(-1);
   const previewRef = useRef<HTMLDivElement>(null);
+  const [isDragOver, setIsDragOver] = useState<"preview" | "edit" | null>(null);
 
   const handleDragStart = (type: ComponentType) => {
     setDraggingComponentType(type);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDragOverPreview = (e: React.DragEvent) => {
     e.preventDefault();
+    setIsDragOver("preview");
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -408,11 +410,27 @@ function App() {
       setComponents([...components, newComponent]);
     }
     setDraggingComponentType(null);
+    setIsDragOver(null);
   };
 
   return (
-    <div className="flex h-screen">
-      <div className="drop-shadow-sm shadow-xl w-1/4 h-full p-8 flex flex-col gap-y-5 items-center pb-20">
+    <div className="flex h-full">
+      <div
+        className={`drop-shadow-sm shadow-xl w-1/4 h-screen p-8 flex flex-col gap-y-5 items-center pb-20 fixed ${
+          isDragOver === "edit" && "bg-main/10"
+        }`}
+        onDragOver={(e) => {
+          e.preventDefault();
+          setIsDragOver("edit");
+        }}
+        onDrop={(e) => {
+          e.preventDefault();
+          setIsDragOver(null);
+        }}
+        onDragLeave={() => {
+          setIsDragOver(null);
+        }}
+      >
         {editingIndex === -1 ? (
           <>
             <span className="text-xl font-medium text-title">元件列表</span>
@@ -464,15 +482,19 @@ function App() {
       </div>
       <div
         ref={previewRef}
-        className="bg-white flex-1 h-full flex flex-col items-center"
-        onDragOver={handleDragOver}
+        className={`bg-white h-full flex flex-col items-center w-3/4 ml-auto min-h-screen ${isDragOver === "preview" && "bg-main/40"}`}
+        onDragOver={handleDragOverPreview}
         onDrop={handleDrop}
+        onDragLeave={() => setIsDragOver(null)}
       >
-        <span className="text-center w-full shadow-2xl text-black/50 border-b border-black/10 py-1">
+        <span className="text-center w-full shadow-2xl text-black/60 border-b bg-white border-black/10 py-1">
           預覽頁面
         </span>
         {components.map((component, index) => (
-          <div key={index} className="w-full">
+          <div
+            key={index}
+            className="w-full"
+          >
             <PreviewComponent
               data={component}
               onClick={() => {
